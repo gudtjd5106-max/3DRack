@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Warehouse</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+    }
+
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+
+    #viewport-3d {
+      flex: 1;
+      position: relative;
+      border: 2px solid black;
+      background: #f0f0f0;
+    }
+
+    #side-panel {
+      width: 300px;
+      padding: 20px;
+      border-left: 2px solid black;
+      box-sizing: border-box;
+      background: #ffffff;
+    }
+
+    #side-panel button {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .btn-type-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .btn-type {
+      flex: 1;
+      padding: 10px 0;
+      border: 1px solid #ccc;
+      background-color: white;
+      cursor: pointer;
+      font-size: 14px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .btn-type.active {
+      border: 2px solid #1976d2;
+      background-color: #e3f2fd;
+      font-weight: bold;
+    }
+
+    .radio-size-group {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    #preview-canvas {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      /* 2열로 */
+      gap: 2px;
+      padding: 10px;
+    }
+
+    .button-grid button {
+      padding: 10px;
+      font-size: 10px;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="selectionBox" style="
+  display: none;
+  position: fixed;
+  border: 1px dashed #00aaff;
+  background-color: rgba(0, 170, 255, 0.1);
+  pointer-events: none;
+  z-index: 1000;
+"></div>
+  <div id="container">
+    <div id="viewport-3d"></div>
+
+    <div id="side-panel">
+      <!-- 미리보기 패널 -->
+      <div id="rack-preview-panel">
+        <div style="font-size: 13px; color: #666; margin-bottom: 4px;">미리보기</div>
+        <canvas id="preview-canvas" width="260" height="140"></canvas>
+      </div>
+
+      <!-- 생성 타입 버튼 -->
+      <div class="btn-type-group">
+        <button class="btn-type" id="btn-type-rack" data-type="rack">랙</button>
+        <button class="btn-type" id="btn-type-pallet" data-type="pallet">파레트</button>
+      </div>
+
+      <!-- 크기 선택 + 확정 -->
+      <div id="rack-options" style="display: none;">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <div style="flex: 1 1 45%;">
+            <label for="rack-cols" style="font-size: 13px;">칸 수 (cols)</label><br>
+            <input type="number" id="rack-cols" value="4" min="1" style="width: 100%;">
+          </div>
+
+          <div style="flex: 1 1 45%;">
+            <label for="rack-floors" style="font-size: 13px;">층 수 (floors)</label><br>
+            <input type="number" id="rack-floors" value="4" min="1" style="width: 100%;">
+          </div>
+
+          <div style="flex: 1 1 45%;">
+            <label for="rack-depth" style="font-size: 13px;">두께 (depth, 칸 수)</label><br>
+            <input type="number" id="rack-depth" value="1" min="1" style="width: 100%;">
+          </div>
+
+          <div style="flex: 1 1 45%;">
+            <label for="rack-cellw" style="font-size: 13px;">칸 너비 (cellW)</label><br>
+            <input type="number" id="rack-cellw" value="1" min="1" style="width: 100%;">
+          </div>
+        </div>
+      </div>
+
+
+      <div id="buttonContainer" class="button-grid">
+
+        <button id="btn-create-rack">생성</button>
+        <button id="btn-delete">랙 삭제</button>
+        <button id="btn-box">박스 추가</button>
+        <button id="btn-grow-custom">바닥 커스텀 확장</button>
+        <div id="floor-grow-panel" style="display: none; margin-top: 20px; font-size: 13px;">
+          <div style="margin-bottom: 8px;">
+            X 확장:
+            <input id="input-grow-x" type="number" value="0" style="width: 60px;">
+            <select id="dir-grow-x">
+              <option value="-1">오른쪽</option>
+              <option value="1">왼쪽</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 8px;">
+            Z 확장:
+            <input id="input-grow-z" type="number" value="0" style="width: 60px;">
+            <select id="dir-grow-z">
+              <option value="1">위</option>
+              <option value="-1">아래</option>
+            </select>
+          </div>
+          <button id="apply-grow-btn">확장 적용</button>
+        </div>
+
+        <button id="toggle-readonly-btn">읽기전용 ON/OFF</button>
+        <button id="btn-draw-line">영역선 그리기</button>
+
+        <div style="margin-top: 20px;">
+          <button id="btn-camera-menu">카메라 보기 전환</button>
+          <div id="camera-options" style="display:none; margin-top:10px;">
+            <button data-view="top">위</button>
+            <button data-view="left">왼쪽</button>
+            <button data-view="right">오른쪽</button>
+            <button data-view="front">정면</button>
+            <button data-view="back">뒤쪽</button>
+          </div>
+          <button id="btn-exit-view" style="display: none; margin-top:10px;">되돌아가기</button>
+        </div>
+        <button id="btn-help">단축키 도움말</button>
+        <button id="btn-save">저장</button>
+        <button id="btn-load">불러오기</button>
+        <button id="btn-toggle-perf">렌더 표시 ON/OFF</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="Viewer3D.js"></script>
+</body>
+
+</html>
